@@ -99,7 +99,7 @@ class TaskController extends Controller
             ->first();
 
         $task->setAttribute('text', App::$request->post('task'));
-        $task->setAttribute('completed', (bool) App::$request->post('completed'));
+        $task->setAttribute('completed', App::$request->post('completed') ? 1 : 0);
         $task->update();
 
         App::$request->redirect('/tasks');
