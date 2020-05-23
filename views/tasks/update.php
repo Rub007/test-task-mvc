@@ -4,14 +4,15 @@
  * @var Task $task
  */
 
+use components\Session;
 use models\Task; ?>
 
 <div class="container">
     <div class="row">
 
-        <?php if ($messages = $_SESSION['__request']['messages'] ?? []): ?>
+        <?php if (Session::has('errors')): ?>
             <ul class="alert alert-danger col-12">
-                <?php foreach ($messages as $message): ?>
+                <?php foreach (Session::get('errors') as $message): ?>
                     <li class="ml-2"><?= $message ?></li>
                 <?php endforeach; ?>
             </ul>

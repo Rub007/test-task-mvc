@@ -31,6 +31,11 @@ class Model
         return $this->attributes;
     }
 
+    public function hasAttributes(): bool
+    {
+        return (bool) $this->getAttributes();
+    }
+
     public function setAttribute(string $name, $value): self
     {
         $this->attributes[$name] = $value;
@@ -93,6 +98,6 @@ class Model
     public function first()
     {
         $modelsData = $this->query->exec();
-        return $modelsData[0] ? $this->fill($modelsData[0]) : null;
+        return isset($modelsData[0]) ? $this->fill($modelsData[0]) : null;
     }
 }

@@ -2,37 +2,40 @@
 
 namespace components;
 
+use rules\RuleInterface;
+
 class Validator
 {
-    protected array $data;
+    protected array $rules;
 
-    protected array $messages;
+    protected array $errorMessages;
 
-    public function __construct(array $data)
+    public function __construct(array $rules)
     {
-        $this->data = $data;
-        $this->messages = [];
+        $this->rules = $rules;
+        $this->errorMessages = [];
     }
 
     public function validate(): bool
     {
-        foreach ($this->data as $key => $value) {
-            if (! $this->{$key}($value)) {
-                $this->messages[$key] = "Attribute $key is invalid";
+        foreach ($this->rules as $attribute => $rules) {
+            foreach ($rules as $rule) {
+                if (! $rule instanceof RuleInterface) {
+                    throw new \RuntimeException('Undefined rule is provided.');
+                }
+
+                if ($rule->handle())
+                {
+                    $this->errorMessages[] = $rule->message($attribute);
+                }
             }
         }
 
-        if (! $this->messages) {
-            return true;
-        }
-
-        Session::flash('messages', $this->messages);
-
-        return false;
+        return ! $this->errorMessages;
     }
 
-    public function email($email)
+    public function errors(): array
     {
-        return filter_var($email, FILTER_VALIDATE_EMAIL);
+        return $this->errorMessages;
     }
 }

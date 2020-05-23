@@ -26,6 +26,11 @@ class Request
         return $_REQUEST['path'] ? explode('/', $this->path()) : [];
     }
 
+    public function referrer()
+    {
+        return $_SERVER['HTTP_REFERER'];
+    }
+    
     public function queryString()
     {
         return $_SERVER['QUERY_STRING'] ?? '';

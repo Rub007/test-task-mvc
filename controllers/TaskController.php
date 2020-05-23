@@ -3,13 +3,18 @@
 namespace controllers;
 
 use components\App;
+use components\Session;
+use components\Ui;
 use components\Validator;
 use models\Task;
 use models\User;
+use rules\Email;
+use rules\IsModifiedString;
+use rules\Required;
 
 class TaskController extends Controller
 {
-    const PER_PAGE = 3;
+    public const PER_PAGE = 3;
 
     protected int $page;
 
@@ -30,8 +35,18 @@ class TaskController extends Controller
             'links' => (int) ceil($tasksCount / self::PER_PAGE)
         ];
 
-        $tasks = $task->select('tasks.id, users.name, tasks.text, tasks.completed')
+        $sortQuery = explode(',', App::$request->get('sort'));
+
+        $sortCredentials = [
+            ! empty($sortQuery[0]) ? $sortQuery[0] : 'id',
+            ! empty($sortQuery[1]) ? $sortQuery[1] : 'desc'
+        ];
+
+        $orderDirection = $sortCredentials[1] === 'desc' ? 'asc' : 'desc';
+
+        $tasks = $task->select('tasks.id, users.name, tasks.text, tasks.completed, tasks.modified')
             ->join('users', 'tasks.user_id = users.id')
+            ->orderBy($sortCredentials[0], $sortCredentials[1])
             ->limitOffset(($this->page - 1) * self::PER_PAGE, self::PER_PAGE)
             ->get();
         
@@ -39,8 +54,6 @@ class TaskController extends Controller
             http_response_code(404);
             die;
         }
-
-        $orderDirection = $this->sort($tasks);
 
         $this->view('tasks/index', [
             'tasks' => $tasks,
@@ -56,8 +69,22 @@ class TaskController extends Controller
     
     public function store(): void
     {
+        if (! Session::has('user')) {
+            Ui::alert('errors', ['Access denied! You must be logged in']);
+            App::$request->redirect('/tasks');
+        }
+
         $validator = new Validator([
-            'email'  => App::$request->post('email'),
+            'email'  => [
+                new Required(App::$request->post('email')),
+                new Email(App::$request->post('email'))
+            ],
+            'name' => [
+                new Required(App::$request->post('name'))
+            ],
+            'text' => [
+                new Required(App::$request->post('task'))
+            ]
         ]);
 
         if ($validator->validate()) {
@@ -72,56 +99,67 @@ class TaskController extends Controller
             $task->setAttribute('text', App::$request->post('task'));
             $task->save();
 
+            Ui::alert('success', 'Task successfully saved!');
             App::$request->redirect('/tasks');
         } else {
-            App::$request->redirect('/tasks/create');
+            Ui::alert('errors', $validator->errors());
+            App::$request->redirect(
+                App::$request->referrer()
+            );
         }
     }
 
     public function edit()
     {
+        if (! Session::has('user')) {
+            Ui::alert('errors', ['Access denied! You must be logged in']);
+            App::$request->redirect('/tasks');
+        }
+
         $task = new Task;
 
         $this->view('tasks/update', [
             'task' => $task
                 ->select('*')
-                ->where('id', '=', App::$request->post('id'))
+                ->where('id', '=', App::$request->get('id'))
                 ->first()
         ]);
     }
 
     public function update()
     {
+        if (! Session::has('user')) {
+            Ui::alert('errors', ['Access denied! You must be logged in']);
+            App::$request->redirect('/tasks');
+        }
+
         $task = new Task;
         $task
             ->select('*')
             ->where('id', '=', App::$request->post('id'))
             ->first();
 
-        $task->setAttribute('text', App::$request->post('task'));
-        $task->setAttribute('completed', App::$request->post('completed') ? 1 : 0);
-        $task->update();
+        $validator = new Validator([
+            'text' => [
+                new IsModifiedString(
+                    $task->getAttribute('text'),
+                    App::$request->post('task')
+                )
+            ]
+        ]);
 
-        App::$request->redirect('/tasks');
-    }
+        if ($validator->validate()) {
+            $task->setAttribute('completed', App::$request->post('completed') ? 1 : 0);
+            $task->setAttribute('modified', 1);
+            $task->update();
 
-
-    private function sort(&$tasks)
-    {
-        // ugly code sorry))
-        $sortCredentials = explode(',', App::$request->get('sort'));
-
-        $sort = [
-            ! empty($sortCredentials[0]) ? $sortCredentials[0] : 'id',
-            ! empty($sortCredentials[1]) ? $sortCredentials[1] : 'desc'
-        ];
-
-        $orderDirection = $sort[1] === 'desc' ? 'asc' : 'desc';
-
-        usort($tasks, function ($item1, $item2) use ($orderDirection, $sort) {
-            return $orderDirection === 'asc' ? $item1->getAttribute($sort[0]) > $item2->getAttribute($sort[0]) : $item1->getAttribute($sort[0]) < $item2->getAttribute($sort[0]);
-        });
-
-        return $orderDirection;
+            Ui::alert('success', 'Task successfully updated!');
+            App::$request->redirect('/tasks');
+        } else {
+            Ui::alert('errors', $validator->errors());
+            App::$request->redirect(
+                App::$request->referrer()
+            );
+        }
     }
 }

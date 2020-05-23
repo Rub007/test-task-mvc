@@ -10,8 +10,6 @@ class App
 
     public static Request $request;
 
-    public static $user;
-
     public function __construct()
     {
         $this->initConfigs();
